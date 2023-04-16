@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  </head>
+  <body>
+    <div class="main">
+      <div class="controls">
+        <h1>제어</h1>
+        <div class="control">
+          <a>축 1 (맨 밑) [ <span id="axis_1_display">50</span> ]</a>
+          <input id="axis_1_input" type="range" min="0" max="180" value="50" />
+        </div>
+        <div class="control">
+          <a>축 2 (중간) [ <span id="axis_2_display">90</span> ]</a>
+          <input id="axis_2_input" type="range" min="0" max="180" value="90" />
+        </div>
+        <div class="control">
+          <a>축 3 (손잡이) [ <span id="axis_3_display">120</span> ]</a>
+          <input id="axis_3_input" type="range" min="110" max="175" value="120" />
+        </div>
+        <button id="resetButton" style="width: 100%;margin-top: 1rem;padding:0.5rem;border-radius:1rem;">리셋</button>
+      </div>
+      <div class="messages">
+        <h1>웹소켓 메세지 로그</h1>
+        <div id="logs">
+        </div>
+      </div>
+    </div>
+    <script>
+        // variables, events
+        const controls = [
+          { display: document.querySelector("#axis_1_display"), input: document.querySelector("#axis_1_input") },
+          { display: document.querySelector("#axis_2_display"), input: document.querySelector("#axis_2_input") },
+          { display: document.querySelector("#axis_3_display"), input: document.querySelector("#axis_3_input") }
+        ];
+        const ws = new WebSocket("ws://localhost:3456");
+        ws.onopen = function () {
+          addlog("-------------------- Websocket ready --------------------");
+          onReady();
+        }
+        // Functions
+        function onReady() {
+          document.querySelector("#resetButton").onclick = resetPacket;
+          for (const val of controls) {
+            val.input.onchange = function() {
+              val.display.textContent = val.input.value;
+              sendSetPacket()
+            };
+          }
+          ws.onmessage = function(event) {
+            routePacket(JSON.parse(event.data));
+            addlog("<<<< RECV " + event.data);
+          }
+        }
+        function addlog(data) {
+          const element = document.createElement("a")
+          element.textContent = data;
+          document.querySelector("#logs")
+            .appendChild(element);
+          document.querySelector("body > div > div.messages").scrollTo(0, 99999999)
+        }
+        function routePacket(packet) {
+          switch (packet.op) {
+            case 'HELLO':
+              packet.axis.map((value, index) => {
+                controls[index].display.textContent = value;
+                controls[index].input.value = value;
+              });
+              break;
+          }
+        }
+        function sendSetPacket() {
+          const axis = controls.map(e => +e.input.value);
+          const packet = JSON.stringify({ op: "SET", axis });
+          ws.send(packet);
+          addlog(">>>> SEND " + packet);
+        }
+        function resetPacket() {
+          ws.send(JSON.stringify({ op: "RESET" }))
+        }
+    </script>
+    <style>
+      * {
+        transition: all 1s ease
+      }
+      body {
+        margin: 0;
+        padding: 1rem;
+        background-color: #777777;
+      }
+      div {
+        color: #CCCCCC;
+      }
+      .main {
+        display: flex;
+        gap: 1rem;
+      }
+      .controls {
+        width: 100%;
+        background-color: #333333;
+        border-radius: 1rem;
+        padding: 1rem;
+        height: calc(100vh - 4rem);
+      }
+      .messages {
+        width: 100%;
+        height: calc(100vh - 4rem);
+        background-color: #333333;
+        border-radius: 1rem;
+        padding: 1rem;
+        height: calc(100vh - 4rem);
+        overflow: auto;
+      }
+      .control {
+        display: grid;
+      }
+      #logs {
+        display:flex;
+        flex-direction:column;
+      }
+    </style>
+  </body>
+</html>
